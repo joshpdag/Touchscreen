@@ -1,654 +1,832 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Info } from 'lucide-react';
-
-export default function TouchscreenSimulation() {
-  const canvasRef = useRef(null);
-  const [touchPoints, setTouchPoints] = useState([]);
-  const [signals, setSignals] = useState([]);
-  const [showInfo, setShowInfo] = useState(true);
-  
-  const GRID = { rows: 3, cols: 3 };
-  const MARGIN = 80;
-  
-  const handleCanvasClick = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    
-    // Only accept clicks in the grid area
-    if (x < MARGIN || x > canvas.width - MARGIN || y < MARGIN || y > canvas.height - MARGIN) {
-      return;
-    }
-    
-    const touchId = Date.now();
-    const newTouch = { x, y, id: touchId, radius: 60 };
-    setTouchPoints(prev => [...prev, newTouch].slice(-3));
-    
-    // Find which electrodes were touched
-    const gridWidth = canvas.width - 2 * MARGIN;
-    const gridHeight = canvas.height - 2 * MARGIN;
-    const cellWidth = gridWidth / GRID.cols;
-    const cellHeight = gridHeight / GRID.rows;
-    
-    const colIndex = Math.round((x - MARGIN) / cellWidth);
-    const rowIndex = Math.round((y - MARGIN) / cellHeight);
-    
-    // Create signals
-    const hSignal = {
-      id: `h-${touchId}`,
-      type: 'horizontal',
-      row: rowIndex,
-      startX: x,
-      currentX: x,
-      y: MARGIN + rowIndex * cellHeight,
-      targetX: canvas.width - MARGIN / 2,
-      progress: 0
-    };
-    
-    const vSignal = {
-      id: `v-${touchId}`,
-      type: 'vertical',
-      col: colIndex,
-      x: MARGIN + colIndex * cellWidth,
-      startY: y,
-      currentY: y,
-      targetY: canvas.height - MARGIN / 2,
-      progress: 0
-    };
-    
-    setSignals(prev => [...prev, hSignal, vSignal]);
-    
-    setTimeout(() => setSignals(prev => prev.filter(s => s.id !== hSignal.id && s.id !== vSignal.id)), 2000);
-    setTimeout(() => setTouchPoints(prev => prev.filter(t => t.id !== touchId)), 3000);
-  };
-  
-  // Animate signals
-  useEffect(() => {
-    if (signals.length === 0) return;
-    
-    const interval = setInterval(() => {
-      setSignals(prev => 
-        prev.map(s => ({ ...s, progress: Math.min(s.progress + 0.04, 1) }))
-            .filter(s => s.progress < 1)
-      );
-    }, 20);
-    
-    return () => clearInterval(interval);
-  }, [signals.length]);
-  
-  // Drawing
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width;
-    const H = canvas.height;
-    const gridW = W - 2 * MARGIN;
-    const gridH = H - 2 * MARGIN;
-    const cellW = gridW / GRID.cols;
-    const cellH = gridH / GRID.rows;
-    
-    // Clear
-    ctx.fillStyle = '#0a0e1a';
-    ctx.fillRect(0, 0, W, H);
-    
-    // Grid background
-    ctx.fillStyle = 'rgba(30, 41, 59, 0.3)';
-    for (let r = 0; r < GRID.rows; r++) {
-      for (let c = 0; c < GRID.cols; c++) {
-        ctx.fillRect(MARGIN + c * cellW + 1, MARGIN + r * cellH + 1, cellW - 2, cellH - 2);
-      }
-    }
-    
-    // Draw electric field lines FIRST (behind everything)
-    drawElectricFields(ctx, cellW, cellH);
-    
-    // Draw electrodes
-    drawElectrodes(ctx, cellW, cellH, W, H);
-    
-    // Draw controllers
-    drawControllers(ctx, W, H);
-    
-    // Draw signals
-    drawSignals(ctx, W, H);
-    
-    // Draw touches
-    drawTouches(ctx);
-    
-  }, [touchPoints, signals]);
-  
-  const drawElectricFields = (ctx, cellW, cellH) => {
-    for (let r = 0; r < GRID.rows; r++) {
-      for (let c = 0; c < GRID.cols; c++) {
-        const x1 = MARGIN + c * cellW;
-        const y1 = MARGIN + r * cellH;
-        const x2 = x1 + cellW;
-        const y2 = y1 + cellH;
-        
-        // Find nearest touch point affecting this cell
-        let nearestTouch = null;
-        let minDist = Infinity;
-        touchPoints.forEach(t => {
-          const nearX = t.x >= x1 - t.radius && t.x <= x2 + t.radius;
-          const nearY = t.y >= y1 - t.radius && t.y <= y2 + t.radius;
-          if (nearX && nearY) {
-            const cx = (x1 + x2) / 2;
-            const cy = (y1 + y2) / 2;
-            const dist = Math.hypot(t.x - cx, t.y - cy);
-            if (dist < minDist) {
-              minDist = dist;
-              nearestTouch = t;
-            }
-          }
-        });
-        
-        // Get charges
-        const topPos = r % 2 === 0;
-        const botPos = (r + 1) % 2 === 0;
-        const leftPos = c % 2 === 0;
-        const rightPos = (c + 1) % 2 === 0;
-        
-        if (!nearestTouch) {
-          // Normal field lines - no touch affecting this cell
-          ctx.strokeStyle = 'rgba(34, 211, 238, 0.6)';
-          ctx.fillStyle = 'rgba(34, 211, 238, 0.6)';
-          ctx.lineWidth = 2;
-          
-          // Vertical field lines (top to bottom)
-          if (topPos !== botPos) {
-            const numLines = 10;
-            for (let i = 1; i <= numLines; i++) {
-              const x = x1 + (cellW * i) / (numLines + 1);
-              ctx.beginPath();
-              ctx.moveTo(x, topPos ? y1 + 5 : y2 - 5);
-              ctx.lineTo(x, topPos ? y2 - 5 : y1 + 5);
-              ctx.stroke();
-              
-              // Arrow
-              const ay = topPos ? y2 - 5 : y1 + 5;
-              const dir = topPos ? 1 : -1;
-              ctx.beginPath();
-              ctx.moveTo(x, ay);
-              ctx.lineTo(x - 4, ay - 6 * dir);
-              ctx.lineTo(x + 4, ay - 6 * dir);
-              ctx.closePath();
-              ctx.fill();
-            }
-          }
-          
-          // Horizontal field lines (left to right)
-          if (leftPos !== rightPos) {
-            const numLines = 10;
-            for (let i = 1; i <= numLines; i++) {
-              const y = y1 + (cellH * i) / (numLines + 1);
-              ctx.beginPath();
-              ctx.moveTo(leftPos ? x1 + 5 : x2 - 5, y);
-              ctx.lineTo(leftPos ? x2 - 5 : x1 + 5, y);
-              ctx.stroke();
-              
-              // Arrow
-              const ax = leftPos ? x2 - 5 : x1 + 5;
-              const dir = leftPos ? 1 : -1;
-              ctx.beginPath();
-              ctx.moveTo(ax, y);
-              ctx.lineTo(ax - 6 * dir, y - 4);
-              ctx.lineTo(ax - 6 * dir, y + 4);
-              ctx.closePath();
-              ctx.fill();
-            }
-          }
-        } else {
-          // Disrupted field lines - draw them curving toward the touch point
-          ctx.strokeStyle = 'rgba(251, 191, 36, 0.7)';
-          ctx.fillStyle = 'rgba(251, 191, 36, 0.7)';
-          ctx.lineWidth = 2;
-          
-          const touch = nearestTouch;
-          
-          // Draw field lines from all four edges toward the touch
-          const numLines = 8;
-          
-          // From top edge
-          if (touch.y > y1) {
-            for (let i = 1; i <= numLines; i++) {
-              const startX = x1 + (cellW * i) / (numLines + 1);
-              const dx = touch.x - startX;
-              const dy = touch.y - y1;
-              const dist = Math.hypot(dx, dy);
-              const stopDist = Math.max(0, dist - touch.radius + 10);
-              const frac = Math.min(1, stopDist / dist);
-              
-              ctx.beginPath();
-              ctx.moveTo(startX, y1 + 5);
-              ctx.quadraticCurveTo(
-                startX + dx * 0.5,
-                y1 + dy * 0.5,
-                startX + dx * frac,
-                y1 + dy * frac
-              );
-              ctx.stroke();
-              
-              // Arrow pointing toward touch
-              const endX = startX + dx * frac;
-              const endY = y1 + dy * frac;
-              const angle = Math.atan2(dy, dx);
-              ctx.beginPath();
-              ctx.moveTo(endX, endY);
-              ctx.lineTo(endX - 5 * Math.cos(angle - 0.4), endY - 5 * Math.sin(angle - 0.4));
-              ctx.lineTo(endX - 5 * Math.cos(angle + 0.4), endY - 5 * Math.sin(angle + 0.4));
-              ctx.closePath();
-              ctx.fill();
-            }
-          }
-          
-          // From bottom edge
-          if (touch.y < y2) {
-            for (let i = 1; i <= numLines; i++) {
-              const startX = x1 + (cellW * i) / (numLines + 1);
-              const dx = touch.x - startX;
-              const dy = touch.y - y2;
-              const dist = Math.hypot(dx, dy);
-              const stopDist = Math.max(0, dist - touch.radius + 10);
-              const frac = Math.min(1, stopDist / dist);
-              
-              ctx.beginPath();
-              ctx.moveTo(startX, y2 - 5);
-              ctx.quadraticCurveTo(
-                startX + dx * 0.5,
-                y2 + dy * 0.5,
-                startX + dx * frac,
-                y2 + dy * frac
-              );
-              ctx.stroke();
-              
-              const endX = startX + dx * frac;
-              const endY = y2 + dy * frac;
-              const angle = Math.atan2(dy, dx);
-              ctx.beginPath();
-              ctx.moveTo(endX, endY);
-              ctx.lineTo(endX - 5 * Math.cos(angle - 0.4), endY - 5 * Math.sin(angle - 0.4));
-              ctx.lineTo(endX - 5 * Math.cos(angle + 0.4), endY - 5 * Math.sin(angle + 0.4));
-              ctx.closePath();
-              ctx.fill();
-            }
-          }
-          
-          // From left edge
-          if (touch.x > x1) {
-            for (let i = 1; i <= numLines; i++) {
-              const startY = y1 + (cellH * i) / (numLines + 1);
-              const dx = touch.x - x1;
-              const dy = touch.y - startY;
-              const dist = Math.hypot(dx, dy);
-              const stopDist = Math.max(0, dist - touch.radius + 10);
-              const frac = Math.min(1, stopDist / dist);
-              
-              ctx.beginPath();
-              ctx.moveTo(x1 + 5, startY);
-              ctx.quadraticCurveTo(
-                x1 + dx * 0.5,
-                startY + dy * 0.5,
-                x1 + dx * frac,
-                startY + dy * frac
-              );
-              ctx.stroke();
-              
-              const endX = x1 + dx * frac;
-              const endY = startY + dy * frac;
-              const angle = Math.atan2(dy, dx);
-              ctx.beginPath();
-              ctx.moveTo(endX, endY);
-              ctx.lineTo(endX - 5 * Math.cos(angle - 0.4), endY - 5 * Math.sin(angle - 0.4));
-              ctx.lineTo(endX - 5 * Math.cos(angle + 0.4), endY - 5 * Math.sin(angle + 0.4));
-              ctx.closePath();
-              ctx.fill();
-            }
-          }
-          
-          // From right edge
-          if (touch.x < x2) {
-            for (let i = 1; i <= numLines; i++) {
-              const startY = y1 + (cellH * i) / (numLines + 1);
-              const dx = touch.x - x2;
-              const dy = touch.y - startY;
-              const dist = Math.hypot(dx, dy);
-              const stopDist = Math.max(0, dist - touch.radius + 10);
-              const frac = Math.min(1, stopDist / dist);
-              
-              ctx.beginPath();
-              ctx.moveTo(x2 - 5, startY);
-              ctx.quadraticCurveTo(
-                x2 + dx * 0.5,
-                startY + dy * 0.5,
-                x2 + dx * frac,
-                startY + dy * frac
-              );
-              ctx.stroke();
-              
-              const endX = x2 + dx * frac;
-              const endY = startY + dy * frac;
-              const angle = Math.atan2(dy, dx);
-              ctx.beginPath();
-              ctx.moveTo(endX, endY);
-              ctx.lineTo(endX - 5 * Math.cos(angle - 0.4), endY - 5 * Math.sin(angle - 0.4));
-              ctx.lineTo(endX - 5 * Math.cos(angle + 0.4), endY - 5 * Math.sin(angle + 0.4));
-              ctx.closePath();
-              ctx.fill();
-            }
-          }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Touchscreen Electric Fields Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-      }
-    }
-  };
-  
-  const drawElectrodes = (ctx, cellW, cellH, W, H) => {
-    // Horizontal electrodes
-    for (let i = 0; i <= GRID.rows; i++) {
-      const y = MARGIN + i * cellH;
-      const isPos = i % 2 === 0;
-      
-      ctx.strokeStyle = isPos ? '#ef4444' : '#3b82f6';
-      ctx.lineWidth = 10;
-      ctx.beginPath();
-      ctx.moveTo(MARGIN - 10, y);
-      ctx.lineTo(W - MARGIN + 10, y);
-      ctx.stroke();
-      
-      // Charge labels
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 24px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      for (let j = 0; j <= GRID.cols; j++) {
-        const x = MARGIN + j * cellW;
-        ctx.fillText(isPos ? '+' : '−', x, y);
-      }
-      
-      // Label on left
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillStyle = isPos ? '#ef4444' : '#3b82f6';
-      ctx.textAlign = 'right';
-      ctx.fillText(isPos ? 'ROW +' : 'ROW −', MARGIN - 20, y);
-    }
-    
-    // Vertical electrodes
-    for (let i = 0; i <= GRID.cols; i++) {
-      const x = MARGIN + i * cellW;
-      const isPos = i % 2 === 0;
-      
-      ctx.strokeStyle = isPos ? '#ef4444' : '#3b82f6';
-      ctx.lineWidth = 10;
-      ctx.beginPath();
-      ctx.moveTo(x, MARGIN - 10);
-      ctx.lineTo(x, H - MARGIN + 10);
-      ctx.stroke();
-      
-      // Charge labels (already drawn above)
-      
-      // Label on top
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillStyle = isPos ? '#ef4444' : '#3b82f6';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(isPos ? 'COL +' : 'COL −', x, MARGIN - 20);
-    }
-  };
-  
-  const drawControllers = (ctx, W, H) => {
-    // Right controller
-    ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
-    ctx.fillRect(W - MARGIN / 2 - 30, MARGIN, 60, H - 2 * MARGIN);
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(W - MARGIN / 2 - 30, MARGIN, 60, H - 2 * MARGIN);
-    
-    ctx.fillStyle = '#22c55e';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.save();
-    ctx.translate(W - MARGIN / 2, H / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText('ROW CONTROLLER', 0, 0);
-    ctx.restore();
-    
-    // Bottom controller
-    ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
-    ctx.fillRect(MARGIN, H - MARGIN / 2 - 30, W - 2 * MARGIN, 60);
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(MARGIN, H - MARGIN / 2 - 30, W - 2 * MARGIN, 60);
-    
-    ctx.fillStyle = '#22c55e';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('COLUMN CONTROLLER', W / 2, H - MARGIN / 2);
-  };
-  
-  const drawSignals = (ctx, W, H) => {
-    signals.forEach(sig => {
-      if (sig.type === 'horizontal') {
-        const x = sig.startX + (sig.targetX - sig.startX) * sig.progress;
-        const grad = ctx.createLinearGradient(x - 25, sig.y, x + 25, sig.y);
-        grad.addColorStop(0, 'rgba(34, 197, 94, 0)');
-        grad.addColorStop(0.5, 'rgba(34, 197, 94, 1)');
-        grad.addColorStop(1, 'rgba(34, 197, 94, 0)');
         
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 14;
-        ctx.beginPath();
-        ctx.moveTo(Math.max(MARGIN, x - 25), sig.y);
-        ctx.lineTo(Math.min(W - MARGIN / 2, x + 25), sig.y);
-        ctx.stroke();
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
         
-        ctx.fillStyle = '#22c55e';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('SIGNAL', x, sig.y - 20);
-      } else {
-        const y = sig.startY + (sig.targetY - sig.startY) * sig.progress;
-        const grad = ctx.createLinearGradient(sig.x, y - 25, sig.x, y + 25);
-        grad.addColorStop(0, 'rgba(34, 197, 94, 0)');
-        grad.addColorStop(0.5, 'rgba(34, 197, 94, 1)');
-        grad.addColorStop(1, 'rgba(34, 197, 94, 0)');
+        .container {
+            max-width: 1000px;
+            width: 100%;
+        }
         
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 14;
-        ctx.beginPath();
-        ctx.moveTo(sig.x, Math.max(MARGIN, y - 25));
-        ctx.lineTo(sig.x, Math.min(H - MARGIN / 2, y + 25));
-        ctx.stroke();
+        .card {
+            background: #1e293b;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 2px solid #334155;
+        }
         
-        ctx.fillStyle = '#22c55e';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('SIGNAL', sig.x + 35, y);
-      }
-    });
-  };
-  
-  const drawTouches = (ctx) => {
-    touchPoints.forEach(touch => {
-      // Finger
-      const grad = ctx.createRadialGradient(touch.x, touch.y, 0, touch.x, touch.y, touch.radius);
-      grad.addColorStop(0, 'rgba(168, 85, 247, 0.95)');
-      grad.addColorStop(0.6, 'rgba(168, 85, 247, 0.5)');
-      grad.addColorStop(1, 'rgba(168, 85, 247, 0)');
-      
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(touch.x, touch.y, touch.radius, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.strokeStyle = '#a855f7';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(touch.x, touch.y, touch.radius, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      // Subtle equipotential circles to show field influence
-      ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.arc(touch.x, touch.y, touch.radius + 20, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(touch.x, touch.y, touch.radius + 40, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      
-      // Label
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 18px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.shadowColor = '#000000';
-      ctx.shadowBlur = 6;
-      ctx.fillText('FINGER', touch.x, touch.y - touch.radius - 20);
-      ctx.shadowBlur = 0;
-    });
-  };
-  
-  return (
-    <div className="w-full min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="max-w-5xl w-full">
-        <div className="bg-slate-900 rounded-xl shadow-2xl overflow-hidden border-2 border-slate-700">
-          
-          {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 p-6">
-            <h1 className="text-4xl font-bold text-white text-center mb-2">
-              Touchscreen Electric Fields
-            </h1>
-            <p className="text-white text-center text-lg opacity-90">
-              See how charged plates create electric fields that detect your touch
-            </p>
-          </div>
-          
-          {/* Info */}
-          {showInfo && (
-            <div className="bg-gradient-to-b from-slate-800 to-slate-900 p-6 border-b border-slate-700">
-              <div className="flex gap-4">
-                <Info className="text-cyan-400 flex-shrink-0 mt-1" size={28} />
-                <div className="text-slate-200 space-y-3">
-                  <h3 className="text-xl font-bold text-white">Four Key Concepts:</h3>
-                  <div className="grid md:grid-cols-2 gap-3 text-base">
-                    <div className="bg-slate-800 p-3 rounded border-l-4 border-red-500">
-                      <strong className="text-red-400">1. Charged Plates</strong>
-                      <p className="text-sm mt-1">Red (+) and blue (−) charged electrodes alternate</p>
+        .header {
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #06b6d4 100%);
+            padding: 32px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: white;
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.125rem;
+        }
+        
+        .info-panel {
+            background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+            padding: 24px;
+            border-bottom: 2px solid #475569;
+        }
+        
+        .info-header {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+        
+        .info-icon {
+            color: #22d3ee;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+        
+        .info-content {
+            flex: 1;
+        }
+        
+        .info-content h3 {
+            color: white;
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+        
+        .concepts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .concept-card {
+            background: #1e293b;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        
+        .concept-card.red { border-left-color: #ef4444; }
+        .concept-card.cyan { border-left-color: #22d3ee; }
+        .concept-card.purple { border-left-color: #a855f7; }
+        .concept-card.green { border-left-color: #22c55e; }
+        
+        .concept-card strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .concept-card.red strong { color: #fca5a5; }
+        .concept-card.cyan strong { color: #67e8f9; }
+        .concept-card.purple strong { color: #c4b5fd; }
+        .concept-card.green strong { color: #86efac; }
+        
+        .concept-card p {
+            color: #cbd5e1;
+            font-size: 0.875rem;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .close-btn:hover {
+            color: white;
+        }
+        
+        .canvas-container {
+            background: #020617;
+            padding: 24px;
+        }
+        
+        #canvas {
+            width: 100%;
+            border: 2px solid #475569;
+            border-radius: 8px;
+            cursor: crosshair;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .controls {
+            background: #334155;
+            padding: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: center;
+            align-items: center;
+            border-top: 2px solid #475569;
+        }
+        
+        .btn {
+            padding: 12px 32px;
+            font-size: 1.125rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn-clear {
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+            color: white;
+        }
+        
+        .btn-clear:hover {
+            background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
+        }
+        
+        .btn-info {
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+            color: white;
+        }
+        
+        .btn-info:hover {
+            background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
+        }
+        
+        .touch-counter {
+            background: #475569;
+            padding: 12px 24px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .touch-counter span:first-child {
+            color: #cbd5e1;
+            font-weight: 600;
+            font-size: 1.125rem;
+        }
+        
+        .touch-counter span:last-child {
+            color: white;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        
+        .legend {
+            background: #1e293b;
+            padding: 24px;
+            border-top: 2px solid #475569;
+        }
+        
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+        
+        .legend-item {
+            background: #334155;
+            padding: 12px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .legend-icon {
+            font-size: 1.875rem;
+            font-weight: bold;
+        }
+        
+        .legend-icon.red { color: #ef4444; }
+        .legend-icon.blue { color: #3b82f6; }
+        
+        .legend-label {
+            color: #cbd5e1;
+        }
+        
+        .legend-svg {
+            width: 30px;
+            height: 20px;
+        }
+        
+        .teaching-notes {
+            margin-top: 24px;
+            background: #1e293b;
+            border: 2px solid #475569;
+            border-radius: 16px;
+            padding: 24px;
+        }
+        
+        .teaching-notes h3 {
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 16px;
+        }
+        
+        .teaching-notes ul {
+            list-style: disc;
+            margin-left: 24px;
+            color: #cbd5e1;
+        }
+        
+        .teaching-notes li {
+            margin-bottom: 8px;
+        }
+        
+        .teaching-notes strong {
+            color: white;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <!-- Header -->
+            <div class="header">
+                <h1>Touchscreen Electric Fields</h1>
+                <p>See how charged plates create electric fields that detect your touch</p>
+            </div>
+            
+            <!-- Info Panel -->
+            <div class="info-panel" id="infoPanel">
+                <div class="info-header">
+                    <svg class="info-icon" width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="info-content">
+                        <h3>Four Key Concepts:</h3>
+                        <div class="concepts-grid">
+                            <div class="concept-card red">
+                                <strong>1. Charged Plates</strong>
+                                <p>Red (+) and blue (−) charged electrodes alternate</p>
+                            </div>
+                            <div class="concept-card cyan">
+                                <strong>2. Electric Fields</strong>
+                                <p>Cyan arrows show fields from + to − (yellow when disrupted)</p>
+                            </div>
+                            <div class="concept-card purple">
+                                <strong>3. Finger Interrupts</strong>
+                                <p>Field lines bend and flow into your conductive finger</p>
+                            </div>
+                            <div class="concept-card green">
+                                <strong>4. Signals Sent</strong>
+                                <p>Green pulses travel to controllers on edges</p>
+                            </div>
+                        </div>
                     </div>
-                    <div className="bg-slate-800 p-3 rounded border-l-4 border-cyan-500">
-                      <strong className="text-cyan-400">2. Electric Fields</strong>
-                      <p className="text-sm mt-1">Cyan arrows show fields from + to − (yellow when disrupted)</p>
-                    </div>
-                    <div className="bg-slate-800 p-3 rounded border-l-4 border-purple-500">
-                      <strong className="text-purple-400">3. Finger Interrupts</strong>
-                      <p className="text-sm mt-1">Field lines bend and flow into your conductive finger</p>
-                    </div>
-                    <div className="bg-slate-800 p-3 rounded border-l-4 border-green-500">
-                      <strong className="text-green-400">4. Signals Sent</strong>
-                      <p className="text-sm mt-1">Green pulses travel to controllers on edges</p>
-                    </div>
-                  </div>
+                    <button class="close-btn" id="closeInfo">✕</button>
                 </div>
-                <button
-                  onClick={() => setShowInfo(false)}
-                  className="text-slate-400 hover:text-white text-2xl h-8"
-                >
-                  ✕
-                </button>
-              </div>
             </div>
-          )}
-          
-          {/* Canvas */}
-          <div className="bg-slate-950 p-6">
-            <canvas
-              ref={canvasRef}
-              width={800}
-              height={800}
-              onClick={handleCanvasClick}
-              className="w-full cursor-crosshair border-2 border-slate-700 rounded-lg shadow-xl"
-            />
-          </div>
-          
-          {/* Controls */}
-          <div className="bg-slate-800 p-6 flex flex-wrap gap-4 justify-center border-t border-slate-700">
-            <button
-              onClick={() => { setTouchPoints([]); setSignals([]); }}
-              className="px-8 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-lg rounded-lg font-bold transition shadow-lg"
-            >
-              Clear All
-            </button>
-            <button
-              onClick={() => setShowInfo(true)}
-              className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-lg rounded-lg font-bold transition shadow-lg"
-            >
-              Show Info
-            </button>
-            <div className="flex items-center gap-3 bg-slate-700 px-6 py-3 rounded-lg">
-              <span className="text-slate-300 font-semibold text-lg">Touches:</span>
-              <span className="text-white font-bold text-2xl">{touchPoints.length}</span>
+            
+            <!-- Canvas -->
+            <div class="canvas-container">
+                <canvas id="canvas" width="800" height="800"></canvas>
             </div>
-          </div>
-          
-          {/* Legend */}
-          <div className="bg-slate-900 p-6 border-t border-slate-700">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="flex items-center gap-3 bg-slate-800 p-3 rounded">
-                <div className="text-3xl text-red-500 font-bold">+</div>
-                <span className="text-slate-300">Positive</span>
-              </div>
-              <div className="flex items-center gap-3 bg-slate-800 p-3 rounded">
-                <div className="text-3xl text-blue-500 font-bold">−</div>
-                <span className="text-slate-300">Negative</span>
-              </div>
-              <div className="flex items-center gap-3 bg-slate-800 p-3 rounded">
-                <svg width="30" height="20" viewBox="0 0 30 20">
-                  <path d="M2 10 L28 10" stroke="#22d3ee" strokeWidth="3" fill="none"/>
-                  <polygon points="28,10 24,8 24,12" fill="#22d3ee"/>
-                </svg>
-                <span className="text-slate-300">Normal Field</span>
-              </div>
-              <div className="flex items-center gap-3 bg-slate-800 p-3 rounded">
-                <svg width="30" height="20" viewBox="0 0 30 20">
-                  <path d="M2 10 Q15 5 28 10" stroke="#fbbf24" strokeWidth="3" fill="none"/>
-                  <polygon points="28,10 24,8 24,12" fill="#fbbf24"/>
-                </svg>
-                <span className="text-slate-300">Disrupted Field</span>
-              </div>
-              <div className="flex items-center gap-3 bg-slate-800 p-3 rounded">
-                <div className="w-6 h-6 bg-purple-500 rounded-full"></div>
-                <span className="text-slate-300">Finger</span>
-              </div>
-              <div className="flex items-center gap-3 bg-slate-800 p-3 rounded">
-                <svg width="30" height="20" viewBox="0 0 30 20">
-                  <path d="M2 10 L28 10" stroke="#22c55e" strokeWidth="4" fill="none"/>
-                </svg>
-                <span className="text-slate-300">Signal</span>
-              </div>
+            
+            <!-- Controls -->
+            <div class="controls">
+                <button class="btn btn-clear" id="clearBtn">Clear All</button>
+                <button class="btn btn-info" id="showInfoBtn">Show Info</button>
+                <div class="touch-counter">
+                    <span>Touches:</span>
+                    <span id="touchCount">0</span>
+                </div>
             </div>
-          </div>
-          
+            
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-grid">
+                    <div class="legend-item">
+                        <div class="legend-icon red">+</div>
+                        <div class="legend-label">Positive</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-icon blue">−</div>
+                        <div class="legend-label">Negative</div>
+                    </div>
+                    <div class="legend-item">
+                        <svg class="legend-svg" viewBox="0 0 30 20">
+                            <path d="M2 10 L28 10" stroke="#22d3ee" stroke-width="3" fill="none"/>
+                            <polygon points="28,10 24,8 24,12" fill="#22d3ee"/>
+                        </svg>
+                        <div class="legend-label">Normal Field</div>
+                    </div>
+                    <div class="legend-item">
+                        <svg class="legend-svg" viewBox="0 0 30 20">
+                            <path d="M2 10 Q15 5 28 10" stroke="#fbbf24" stroke-width="3" fill="none"/>
+                            <polygon points="28,10 24,8 24,12" fill="#fbbf24"/>
+                        </svg>
+                        <div class="legend-label">Disrupted Field</div>
+                    </div>
+                    <div class="legend-item">
+                        <div style="width:24px;height:24px;background:#a855f7;border-radius:50%;"></div>
+                        <div class="legend-label">Finger</div>
+                    </div>
+                    <div class="legend-item">
+                        <svg class="legend-svg" viewBox="0 0 30 20">
+                            <path d="M2 10 L28 10" stroke="#22c55e" stroke-width="4" fill="none"/>
+                        </svg>
+                        <div class="legend-label">Signal</div>
+                    </div>
+                </div>
+            </div>
         </div>
         
-        {/* Teaching Notes */}
-        <div className="mt-6 bg-slate-900 border-2 border-slate-700 rounded-xl p-6">
-          <h3 className="text-2xl font-bold text-white mb-4">🎯 Learning Objectives</h3>
-          <div className="space-y-3 text-slate-300">
-            <p className="text-lg"><strong className="text-white">Students will understand:</strong></p>
-            <ul className="space-y-2 ml-6 list-disc text-base">
-              <li>Opposite charges (+/−) create <strong>electric fields</strong> between them</li>
-              <li>A <strong>grid of electrodes</strong> creates multiple electric field regions</li>
-              <li>A conductive finger <strong>attracts and redirects</strong> field lines into itself</li>
-              <li><strong>Signals are sent</strong> to controllers that calculate the touch position</li>
+        <!-- Teaching Notes -->
+        <div class="teaching-notes">
+            <h3>🎯 Learning Objectives</h3>
+            <p style="color:#cbd5e1;font-size:1.125rem;margin-bottom:12px;"><strong style="color:white;">Students will understand:</strong></p>
+            <ul>
+                <li>Opposite charges (+/−) create <strong>electric fields</strong> between them</li>
+                <li>A <strong>grid of electrodes</strong> creates multiple electric field regions</li>
+                <li>A conductive finger <strong>attracts and redirects</strong> field lines into itself</li>
+                <li><strong>Signals are sent</strong> to controllers that calculate the touch position</li>
             </ul>
-          </div>
         </div>
-      </div>
     </div>
-  );
-}
+
+    <script>
+        // Configuration
+        const GRID = { rows: 3, cols: 3 };
+        const MARGIN = 80;
+        
+        // State
+        let touchPoints = [];
+        let signals = [];
+        let animationFrame = null;
+        
+        // Get elements
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const infoPanel = document.getElementById('infoPanel');
+        const closeInfo = document.getElementById('closeInfo');
+        const showInfoBtn = document.getElementById('showInfoBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const touchCount = document.getElementById('touchCount');
+        
+        // Event listeners
+        canvas.addEventListener('click', handleCanvasClick);
+        clearBtn.addEventListener('click', clearAll);
+        closeInfo.addEventListener('click', () => infoPanel.classList.add('hidden'));
+        showInfoBtn.addEventListener('click', () => infoPanel.classList.remove('hidden'));
+        
+        function handleCanvasClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            
+            // Only accept clicks in grid area
+            if (x < MARGIN || x > canvas.width - MARGIN || y < MARGIN || y > canvas.height - MARGIN) {
+                return;
+            }
+            
+            const touchId = Date.now();
+            const newTouch = { x, y, id: touchId, radius: 60 };
+            touchPoints.push(newTouch);
+            if (touchPoints.length > 3) touchPoints.shift();
+            
+            // Find which electrodes were touched
+            const gridWidth = canvas.width - 2 * MARGIN;
+            const gridHeight = canvas.height - 2 * MARGIN;
+            const cellWidth = gridWidth / GRID.cols;
+            const cellHeight = gridHeight / GRID.rows;
+            
+            const colIndex = Math.round((x - MARGIN) / cellWidth);
+            const rowIndex = Math.round((y - MARGIN) / cellHeight);
+            
+            // Create signals
+            signals.push({
+                id: `h-${touchId}`,
+                type: 'horizontal',
+                row: rowIndex,
+                startX: x,
+                currentX: x,
+                y: MARGIN + rowIndex * cellHeight,
+                targetX: canvas.width - MARGIN / 2,
+                progress: 0
+            });
+            
+            signals.push({
+                id: `v-${touchId}`,
+                type: 'vertical',
+                col: colIndex,
+                x: MARGIN + colIndex * cellWidth,
+                startY: y,
+                currentY: y,
+                targetY: canvas.height - MARGIN / 2,
+                progress: 0
+            });
+            
+            setTimeout(() => {
+                touchPoints = touchPoints.filter(t => t.id !== touchId);
+                updateTouchCount();
+            }, 3000);
+            
+            updateTouchCount();
+            if (!animationFrame) animate();
+        }
+        
+        function clearAll() {
+            touchPoints = [];
+            signals = [];
+            updateTouchCount();
+        }
+        
+        function updateTouchCount() {
+            touchCount.textContent = touchPoints.length;
+        }
+        
+        function animate() {
+            // Update signal positions
+            signals = signals.map(sig => {
+                const newProgress = Math.min(sig.progress + 0.04, 1);
+                return { ...sig, progress: newProgress };
+            }).filter(s => s.progress < 1);
+            
+            draw();
+            
+            if (signals.length > 0 || touchPoints.length > 0) {
+                animationFrame = requestAnimationFrame(animate);
+            } else {
+                animationFrame = null;
+            }
+        }
+        
+        function draw() {
+            const W = canvas.width;
+            const H = canvas.height;
+            const gridW = W - 2 * MARGIN;
+            const gridH = H - 2 * MARGIN;
+            const cellW = gridW / GRID.cols;
+            const cellH = gridH / GRID.rows;
+            
+            // Clear
+            ctx.fillStyle = '#0a0e1a';
+            ctx.fillRect(0, 0, W, H);
+            
+            // Grid background
+            ctx.fillStyle = 'rgba(30, 41, 59, 0.3)';
+            for (let r = 0; r < GRID.rows; r++) {
+                for (let c = 0; c < GRID.cols; c++) {
+                    ctx.fillRect(MARGIN + c * cellW + 1, MARGIN + r * cellH + 1, cellW - 2, cellH - 2);
+                }
+            }
+            
+            // Draw electric field lines
+            drawElectricFields(cellW, cellH);
+            
+            // Draw electrodes
+            drawElectrodes(cellW, cellH, W, H);
+            
+            // Draw controllers
+            drawControllers(W, H);
+            
+            // Draw signals
+            drawSignals(W, H);
+            
+            // Draw touches
+            drawTouches();
+        }
+        
+        function drawElectricFields(cellW, cellH) {
+            for (let r = 0; r < GRID.rows; r++) {
+                for (let c = 0; c < GRID.cols; c++) {
+                    const x1 = MARGIN + c * cellW;
+                    const y1 = MARGIN + r * cellH;
+                    const x2 = x1 + cellW;
+                    const y2 = y1 + cellH;
+                    
+                    // Find nearest touch
+                    let nearestTouch = null;
+                    let minDist = Infinity;
+                    
+                    touchPoints.forEach(t => {
+                        const nearX = t.x >= x1 - t.radius && t.x <= x2 + t.radius;
+                        const nearY = t.y >= y1 - t.radius && t.y <= y2 + t.radius;
+                        if (nearX && nearY) {
+                            const cx = (x1 + x2) / 2;
+                            const cy = (y1 + y2) / 2;
+                            const dist = Math.hypot(t.x - cx, t.y - cy);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                nearestTouch = t;
+                            }
+                        }
+                    });
+                    
+                    const topPos = r % 2 === 0;
+                    const botPos = (r + 1) % 2 === 0;
+                    const leftPos = c % 2 === 0;
+                    const rightPos = (c + 1) % 2 === 0;
+                    
+                    if (!nearestTouch) {
+                        drawNormalFields(x1, y1, x2, y2, cellW, cellH, topPos, botPos, leftPos, rightPos);
+                    } else {
+                        drawDisruptedFields(x1, y1, x2, y2, nearestTouch);
+                    }
+                }
+            }
+        }
+        
+        function drawNormalFields(x1, y1, x2, y2, cellW, cellH, topPos, botPos, leftPos, rightPos) {
+            ctx.strokeStyle = 'rgba(34, 211, 238, 0.6)';
+            ctx.fillStyle = 'rgba(34, 211, 238, 0.6)';
+            ctx.lineWidth = 2;
+            
+            const numLines = 10;
+            
+            // Vertical field lines
+            if (topPos !== botPos) {
+                for (let i = 1; i <= numLines; i++) {
+                    const x = x1 + (cellW * i) / (numLines + 1);
+                    ctx.beginPath();
+                    ctx.moveTo(x, topPos ? y1 + 5 : y2 - 5);
+                    ctx.lineTo(x, topPos ? y2 - 5 : y1 + 5);
+                    ctx.stroke();
+                    
+                    const ay = topPos ? y2 - 5 : y1 + 5;
+                    const dir = topPos ? 1 : -1;
+                    ctx.beginPath();
+                    ctx.moveTo(x, ay);
+                    ctx.lineTo(x - 4, ay - 6 * dir);
+                    ctx.lineTo(x + 4, ay - 6 * dir);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+            
+            // Horizontal field lines
+            if (leftPos !== rightPos) {
+                for (let i = 1; i <= numLines; i++) {
+                    const y = y1 + (cellH * i) / (numLines + 1);
+                    ctx.beginPath();
+                    ctx.moveTo(leftPos ? x1 + 5 : x2 - 5, y);
+                    ctx.lineTo(leftPos ? x2 - 5 : x1 + 5, y);
+                    ctx.stroke();
+                    
+                    const ax = leftPos ? x2 - 5 : x1 + 5;
+                    const dir = leftPos ? 1 : -1;
+                    ctx.beginPath();
+                    ctx.moveTo(ax, y);
+                    ctx.lineTo(ax - 6 * dir, y - 4);
+                    ctx.lineTo(ax - 6 * dir, y + 4);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+        }
+        
+        function drawDisruptedFields(x1, y1, x2, y2, touch) {
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.7)';
+            ctx.fillStyle = 'rgba(251, 191, 36, 0.7)';
+            ctx.lineWidth = 2;
+            
+            const numLines = 8;
+            const edges = [
+                { startX: (i) => x1 + ((x2-x1) * i) / (numLines + 1), startY: () => y1 + 5, check: () => touch.y > y1 },
+                { startX: (i) => x1 + ((x2-x1) * i) / (numLines + 1), startY: () => y2 - 5, check: () => touch.y < y2 },
+                { startX: () => x1 + 5, startY: (i) => y1 + ((y2-y1) * i) / (numLines + 1), check: () => touch.x > x1 },
+                { startX: () => x2 - 5, startY: (i) => y1 + ((y2-y1) * i) / (numLines + 1), check: () => touch.x < x2 }
+            ];
+            
+            edges.forEach((edge, edgeIdx) => {
+                if (!edge.check()) return;
+                
+                for (let i = 1; i <= numLines; i++) {
+                    const sx = typeof edge.startX === 'function' ? edge.startX(i) : edge.startX();
+                    const sy = typeof edge.startY === 'function' ? edge.startY(i) : edge.startY();
+                    const dx = touch.x - sx;
+                    const dy = touch.y - sy;
+                    const dist = Math.hypot(dx, dy);
+                    const stopDist = Math.max(0, dist - touch.radius + 10);
+                    const frac = Math.min(1, stopDist / dist);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(sx, sy);
+                    ctx.quadraticCurveTo(sx + dx * 0.5, sy + dy * 0.5, sx + dx * frac, sy + dy * frac);
+                    ctx.stroke();
+                    
+                    const endX = sx + dx * frac;
+                    const endY = sy + dy * frac;
+                    const angle = Math.atan2(dy, dx);
+                    ctx.beginPath();
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(endX - 5 * Math.cos(angle - 0.4), endY - 5 * Math.sin(angle - 0.4));
+                    ctx.lineTo(endX - 5 * Math.cos(angle + 0.4), endY - 5 * Math.sin(angle + 0.4));
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            });
+        }
+        
+        function drawElectrodes(cellW, cellH, W, H) {
+            // Horizontal electrodes
+            for (let i = 0; i <= GRID.rows; i++) {
+                const y = MARGIN + i * cellH;
+                const isPos = i % 2 === 0;
+                
+                ctx.strokeStyle = isPos ? '#ef4444' : '#3b82f6';
+                ctx.lineWidth = 10;
+                ctx.beginPath();
+                ctx.moveTo(MARGIN - 10, y);
+                ctx.lineTo(W - MARGIN + 10, y);
+                ctx.stroke();
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                for (let j = 0; j <= GRID.cols; j++) {
+                    const x = MARGIN + j * cellW;
+                    ctx.fillText(isPos ? '+' : '−', x, y);
+                }
+                
+                ctx.font = 'bold 16px sans-serif';
+                ctx.fillStyle = isPos ? '#ef4444' : '#3b82f6';
+                ctx.textAlign = 'right';
+                ctx.fillText(isPos ? 'ROW +' : 'ROW −', MARGIN - 20, y);
+            }
+            
+            // Vertical electrodes
+            for (let i = 0; i <= GRID.cols; i++) {
+                const x = MARGIN + i * cellW;
+                const isPos = i % 2 === 0;
+                
+                ctx.strokeStyle = isPos ? '#ef4444' : '#3b82f6';
+                ctx.lineWidth = 10;
+                ctx.beginPath();
+                ctx.moveTo(x, MARGIN - 10);
+                ctx.lineTo(x, H - MARGIN + 10);
+                ctx.stroke();
+                
+                ctx.font = 'bold 16px sans-serif';
+                ctx.fillStyle = isPos ? '#ef4444' : '#3b82f6';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(isPos ? 'COL +' : 'COL −', x, MARGIN - 20);
+            }
+        }
+        
+        function drawControllers(W, H) {
+            // Right controller
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
+            ctx.fillRect(W - MARGIN/2 - 30, MARGIN, 60, H - 2*MARGIN);
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(W - MARGIN/2 - 30, MARGIN, 60, H - 2*MARGIN);
+            
+            ctx.fillStyle = '#22c55e';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.save();
+            ctx.translate(W - MARGIN/2, H/2);
+            ctx.rotate(-Math.PI/2);
+            ctx.fillText('ROW CONTROLLER', 0, 0);
+            ctx.restore();
+            
+            // Bottom controller
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
+            ctx.fillRect(MARGIN, H - MARGIN/2 - 30, W - 2*MARGIN, 60);
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(MARGIN, H - MARGIN/2 - 30, W - 2*MARGIN, 60);
+            
+            ctx.fillStyle = '#22c55e';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('COLUMN CONTROLLER', W/2, H - MARGIN/2);
+        }
+        
+        function drawSignals(W, H) {
+            signals.forEach(sig => {
+                if (sig.type === 'horizontal') {
+                    const x = sig.startX + (sig.targetX - sig.startX) * sig.progress;
+                    const grad = ctx.createLinearGradient(x - 25, sig.y, x + 25, sig.y);
+                    grad.addColorStop(0, 'rgba(34, 197, 94, 0)');
+                    grad.addColorStop(0.5, 'rgba(34, 197, 94, 1)');
+                    grad.addColorStop(1, 'rgba(34, 197, 94, 0)');
+                    
+                    ctx.strokeStyle = grad;
+                    ctx.lineWidth = 14;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.max(MARGIN, x - 25), sig.y);
+                    ctx.lineTo(Math.min(W - MARGIN/2, x + 25), sig.y);
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#22c55e';
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('SIGNAL', x, sig.y - 20);
+                } else {
+                    const y = sig.startY + (sig.targetY - sig.startY) * sig.progress;
+                    const grad = ctx.createLinearGradient(sig.x, y - 25, sig.x, y + 25);
+                    grad.addColorStop(0, 'rgba(34, 197, 94, 0)');
+                    grad.addColorStop(0.5, 'rgba(34, 197, 94, 1)');
+                    grad.addColorStop(1, 'rgba(34, 197, 94, 0)');
+                    
+                    ctx.strokeStyle = grad;
+                    ctx.lineWidth = 14;
+                    ctx.beginPath();
+                    ctx.moveTo(sig.x, Math.max(MARGIN, y - 25));
+                    ctx.lineTo(sig.x, Math.min(H - MARGIN/2, y + 25));
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#22c55e';
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('SIGNAL', sig.x + 35, y);
+                }
+            });
+        }
+        
+        function drawTouches() {
+            touchPoints.forEach(touch => {
+                const grad = ctx.createRadialGradient(touch.x, touch.y, 0, touch.x, touch.y, touch.radius);
+                grad.addColorStop(0, 'rgba(168, 85, 247, 0.95)');
+                grad.addColorStop(0.6, 'rgba(168, 85, 247, 0.5)');
+                grad.addColorStop(1, 'rgba(168, 85, 247, 0)');
+                
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y, touch.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#a855f7';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y, touch.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Equipotential circles
+                ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y, touch.radius + 20, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y, touch.radius + 40, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 18px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#000000';
+                ctx.shadowBlur = 6;
+                ctx.fillText('FINGER', touch.x, touch.y - touch.radius - 20);
+                ctx.shadowBlur = 0;
+            });
+        }
+        
+        // Initial draw
+        draw();
+    </script>
+</body>
+</html>
