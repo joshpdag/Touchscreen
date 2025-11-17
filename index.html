@@ -3,791 +3,616 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Touchscreen Electric Fields Simulation</title>
+    <title>Touchscreen Simulation</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: white;
             display: flex;
-            align-items: center;
             justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
             padding: 20px;
         }
         
         .container {
-            max-width: 1000px;
+            max-width: 1400px;
             width: 100%;
         }
         
-        .card {
-            background: #1e293b;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            border: 2px solid #334155;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #06b6d4 100%);
-            padding: 32px;
+        h1 {
             text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: #60a5fa;
         }
         
-        .header h1 {
-            color: white;
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-        
-        .header p {
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 1.125rem;
-        }
-        
-        .info-panel {
-            background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
-            padding: 24px;
-            border-bottom: 2px solid #475569;
-        }
-        
-        .info-header {
-            display: flex;
-            gap: 16px;
-            align-items: flex-start;
-        }
-        
-        .info-icon {
-            color: #22d3ee;
-            flex-shrink: 0;
-            margin-top: 4px;
-        }
-        
-        .info-content {
-            flex: 1;
-        }
-        
-        .info-content h3 {
-            color: white;
-            font-size: 1.25rem;
-            font-weight: bold;
-            margin-bottom: 12px;
-        }
-        
-        .concepts-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-        
-        .concept-card {
-            background: #1e293b;
-            padding: 12px;
-            border-radius: 8px;
-            border-left: 4px solid;
-        }
-        
-        .concept-card.red { border-left-color: #ef4444; }
-        .concept-card.cyan { border-left-color: #22d3ee; }
-        .concept-card.purple { border-left-color: #a855f7; }
-        .concept-card.green { border-left-color: #22c55e; }
-        
-        .concept-card strong {
-            display: block;
-            margin-bottom: 4px;
-        }
-        
-        .concept-card.red strong { color: #fca5a5; }
-        .concept-card.cyan strong { color: #67e8f9; }
-        .concept-card.purple strong { color: #c4b5fd; }
-        .concept-card.green strong { color: #86efac; }
-        
-        .concept-card p {
-            color: #cbd5e1;
-            font-size: 0.875rem;
-        }
-        
-        .close-btn {
-            background: none;
-            border: none;
+        .subtitle {
+            text-align: center;
             color: #94a3b8;
-            font-size: 1.5rem;
-            cursor: pointer;
-            padding: 0;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .close-btn:hover {
-            color: white;
-        }
-        
-        .canvas-container {
-            background: #020617;
-            padding: 24px;
-        }
-        
-        #canvas {
-            width: 100%;
-            border: 2px solid #475569;
-            border-radius: 8px;
-            cursor: crosshair;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            margin-bottom: 30px;
+            font-size: 1.1em;
         }
         
         .controls {
-            background: #334155;
-            padding: 24px;
             display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
             justify-content: center;
-            align-items: center;
-            border-top: 2px solid #475569;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
         }
         
-        .btn {
-            padding: 12px 32px;
-            font-size: 1.125rem;
+        .toggle-btn {
+            padding: 12px 24px;
+            font-size: 16px;
             font-weight: bold;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         
-        .btn-clear {
-            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+        .toggle-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+        
+        .conductor-mode {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
         }
         
-        .btn-clear:hover {
-            background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
-        }
-        
-        .btn-info {
-            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+        .insulator-mode {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
             color: white;
         }
         
-        .btn-info:hover {
-            background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
-        }
-        
-        .touch-counter {
-            background: #475569;
+        .mode-indicator {
             padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 8px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .touch-counter span:first-child {
-            color: #cbd5e1;
-            font-weight: 600;
-            font-size: 1.125rem;
-        }
-        
-        .touch-counter span:last-child {
-            color: white;
+            font-size: 16px;
             font-weight: bold;
-            font-size: 1.5rem;
+        }
+        
+        .canvas-container {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+        }
+        
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border: 3px solid #475569;
+            border-radius: 8px;
+            cursor: crosshair;
+            background: #1e293b;
+        }
+        
+        .info-panel {
+            background: rgba(30, 41, 59, 0.8);
+            border: 2px solid #475569;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        
+        .info-panel h2 {
+            color: #60a5fa;
+            margin-top: 0;
+            font-size: 1.8em;
+            border-bottom: 2px solid #475569;
+            padding-bottom: 10px;
         }
         
         .legend {
-            background: #1e293b;
-            padding: 24px;
-            border-top: 2px solid #475569;
-        }
-        
-        .legend-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+            margin-top: 0;
+            padding: 0;
         }
         
         .legend-item {
-            background: #334155;
-            padding: 12px;
-            border-radius: 8px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
+            font-size: 16px;
         }
         
-        .legend-icon {
-            font-size: 1.875rem;
-            font-weight: bold;
-        }
-        
-        .legend-icon.red { color: #ef4444; }
-        .legend-icon.blue { color: #3b82f6; }
-        
-        .legend-label {
-            color: #cbd5e1;
-        }
-        
-        .legend-svg {
-            width: 30px;
-            height: 20px;
-        }
-        
-
-        .hidden {
-            display: none;
+        .legend-color {
+            width: 35px;
+            height: 25px;
+            border-radius: 4px;
+            border: 2px solid white;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="card">
-            <!-- Header -->
-            <div class="header">
-                <h1>Touchscreen Electric Fields</h1>
-                <p>See how charged plates create electric fields that detect your touch</p>
-            </div>
+        <h1>Capacitive Touchscreen Simulation</h1>
+        <p class="subtitle">Understanding How Your Device Detects Touch</p>
+        
+        <div class="controls">
+            <button id="toggleMode" class="toggle-btn conductor-mode">Switch to Insulator Mode</button>
+            <div id="modeIndicator" class="mode-indicator">Current Mode: <strong>Conductor</strong> (Finger)</div>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="canvas" width="900" height="700"></canvas>
+        </div>
+        
+        <div class="info-panel">
+            <h2>Legend</h2>
             
-            <!-- Info Panel -->
-            <div class="info-panel" id="infoPanel">
-                <div class="info-header">
-                    <svg class="info-icon" width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <div class="info-content">
-                        <h3>Four Key Concepts:</h3>
-                        <div class="concepts-grid">
-                            <div class="concept-card red">
-                                <strong>1. Charged Plates</strong>
-                                <p>Red (+) and blue (−) charged electrodes alternate</p>
-                            </div>
-                            <div class="concept-card cyan">
-                                <strong>2. Electric Fields</strong>
-                                <p>Cyan arrows show fields from + to − (yellow when disrupted)</p>
-                            </div>
-                            <div class="concept-card purple">
-                                <strong>3. Finger Interrupts</strong>
-                                <p>Field lines bend and flow into your conductive finger</p>
-                            </div>
-                            <div class="concept-card green">
-                                <strong>4. Signals Sent</strong>
-                                <p>Green pulses travel to controllers on edges</p>
-                            </div>
-                        </div>
-                    </div>
-                    <button class="close-btn" id="closeInfo">✕</button>
-                </div>
-            </div>
-            
-            <!-- Canvas -->
-            <div class="canvas-container">
-                <canvas id="canvas" width="800" height="800"></canvas>
-            </div>
-            
-            <!-- Controls -->
-            <div class="controls">
-                <button class="btn btn-clear" id="clearBtn">Clear All</button>
-                <button class="btn btn-info" id="showInfoBtn">Show Info</button>
-                <div class="touch-counter">
-                    <span>Touches:</span>
-                    <span id="touchCount">0</span>
-                </div>
-            </div>
-            
-            <!-- Legend -->
             <div class="legend">
-                <div class="legend-grid">
-                    <div class="legend-item">
-                        <div class="legend-icon red">+</div>
-                        <div class="legend-label">Positive</div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-icon blue">−</div>
-                        <div class="legend-label">Negative</div>
-                    </div>
-                    <div class="legend-item">
-                        <svg class="legend-svg" viewBox="0 0 30 20">
-                            <path d="M2 10 L28 10" stroke="#22d3ee" stroke-width="3" fill="none"/>
-                            <polygon points="28,10 24,8 24,12" fill="#22d3ee"/>
-                        </svg>
-                        <div class="legend-label">Normal Field</div>
-                    </div>
-                    <div class="legend-item">
-                        <svg class="legend-svg" viewBox="0 0 30 20">
-                            <path d="M2 10 Q15 5 28 10" stroke="#fbbf24" stroke-width="3" fill="none"/>
-                            <polygon points="28,10 24,8 24,12" fill="#fbbf24"/>
-                        </svg>
-                        <div class="legend-label">Disrupted Field</div>
-                    </div>
-                    <div class="legend-item">
-                        <div style="width:24px;height:24px;background:#a855f7;border-radius:50%;"></div>
-                        <div class="legend-label">Finger</div>
-                    </div>
-                    <div class="legend-item">
-                        <svg class="legend-svg" viewBox="0 0 30 20">
-                            <path d="M2 10 L28 10" stroke="#22c55e" stroke-width="4" fill="none"/>
-                        </svg>
-                        <div class="legend-label">Signal</div>
-                    </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ef4444;"></div>
+                    <span>+ Horizontal Electrodes</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #3b82f6;"></div>
+                    <span>− Vertical Electrodes</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #22d3ee;"></div>
+                    <span>Electric Field</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #a855f7;"></div>
+                    <span>Conductor Touch</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f59e0b;"></div>
+                    <span>Insulator Touch</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #22c55e;"></div>
+                    <span>Signal</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #94a3b8;"></div>
+                    <span>Wire Connection</span>
                 </div>
             </div>
         </div>
-
     </div>
 
     <script>
-        // Configuration
-        const GRID = { rows: 3, cols: 3 };
-        const MARGIN = 80;
-        
-        // State
-        let touchPoints = [];
-        let signals = [];
-        let animationFrame = null;
-        
-        // Get elements
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const infoPanel = document.getElementById('infoPanel');
-        const closeInfo = document.getElementById('closeInfo');
-        const showInfoBtn = document.getElementById('showInfoBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const touchCount = document.getElementById('touchCount');
         
-        // Event listeners
-        canvas.addEventListener('click', handleCanvasClick);
-        clearBtn.addEventListener('click', clearAll);
-        closeInfo.addEventListener('click', () => infoPanel.classList.add('hidden'));
-        showInfoBtn.addEventListener('click', () => infoPanel.classList.remove('hidden'));
+        let isConductor = true;
+        let touchPoints = [];
+        let signals = [];
         
-        function handleCanvasClick(e) {
+        const GRID = { rows: 3, cols: 3 };
+        const MARGIN = 80;
+        const gridWidth = canvas.width - 2 * MARGIN;
+        const gridHeight = canvas.height - 2 * MARGIN;
+        const cellWidth = gridWidth / GRID.cols;
+        const cellHeight = gridHeight / GRID.rows;
+        
+        // Toggle mode
+        document.getElementById('toggleMode').addEventListener('click', () => {
+            isConductor = !isConductor;
+            const btn = document.getElementById('toggleMode');
+            const indicator = document.getElementById('modeIndicator');
+            
+            if (isConductor) {
+                btn.textContent = 'Switch to Insulator Mode';
+                btn.className = 'toggle-btn conductor-mode';
+                indicator.innerHTML = 'Current Mode: <strong>Conductor</strong> (Finger)';
+            } else {
+                btn.textContent = 'Switch to Conductor Mode';
+                btn.className = 'toggle-btn insulator-mode';
+                indicator.innerHTML = 'Current Mode: <strong>Insulator</strong> (Glove)';
+            }
+        });
+        
+        // Handle clicks
+        canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const x = (e.clientX - rect.left) * (canvas.width / rect.width);
             const y = (e.clientY - rect.top) * (canvas.height / rect.height);
             
-            // Only accept clicks in grid area
+            // Check if click is in grid area
             if (x < MARGIN || x > canvas.width - MARGIN || y < MARGIN || y > canvas.height - MARGIN) {
                 return;
             }
             
             const touchId = Date.now();
-            const newTouch = { x, y, id: touchId, radius: 60 };
-            touchPoints.push(newTouch);
-            if (touchPoints.length > 3) touchPoints.shift();
-            
-            // Find which electrodes were touched
-            const gridWidth = canvas.width - 2 * MARGIN;
-            const gridHeight = canvas.height - 2 * MARGIN;
-            const cellWidth = gridWidth / GRID.cols;
-            const cellHeight = gridHeight / GRID.rows;
-            
-            const colIndex = Math.round((x - MARGIN) / cellWidth);
-            const rowIndex = Math.round((y - MARGIN) / cellHeight);
-            
-            // Create signals
-            signals.push({
-                id: `h-${touchId}`,
-                type: 'horizontal',
-                row: rowIndex,
-                startX: x,
-                currentX: x,
-                y: MARGIN + rowIndex * cellHeight,
-                targetX: canvas.width - MARGIN / 2,
-                progress: 0
+            touchPoints.push({
+                x: x,
+                y: y,
+                id: touchId,
+                alpha: 1.0
             });
             
-            signals.push({
-                id: `v-${touchId}`,
-                type: 'vertical',
-                col: colIndex,
-                x: MARGIN + colIndex * cellWidth,
-                startY: y,
-                currentY: y,
-                targetY: canvas.height - MARGIN / 2,
-                progress: 0
-            });
-            
-            setTimeout(() => {
-                touchPoints = touchPoints.filter(t => t.id !== touchId);
-                updateTouchCount();
-            }, 3000);
-            
-            updateTouchCount();
-            if (!animationFrame) animate();
-        }
-        
-        function clearAll() {
-            touchPoints = [];
-            signals = [];
-            updateTouchCount();
-        }
-        
-        function updateTouchCount() {
-            touchCount.textContent = touchPoints.length;
-        }
-        
-        function animate() {
-            // Update signal positions
-            signals = signals.map(sig => {
-                const newProgress = Math.min(sig.progress + 0.04, 1);
-                return { ...sig, progress: newProgress };
-            }).filter(s => s.progress < 1);
-            
-            draw();
-            
-            if (signals.length > 0 || touchPoints.length > 0) {
-                animationFrame = requestAnimationFrame(animate);
-            } else {
-                animationFrame = null;
+            // Only generate signals if using a conductor (insulators don't trigger touchscreens!)
+            if (isConductor) {
+                // Find which electrodes
+                const colIndex = Math.round((x - MARGIN) / cellWidth);
+                const rowIndex = Math.round((y - MARGIN) / cellHeight);
+                
+                // Create signals
+                signals.push({
+                    id: `h-${touchId}`,
+                    type: 'horizontal',
+                    row: rowIndex,
+                    startX: x,
+                    startY: MARGIN + rowIndex * cellHeight,
+                    endX: canvas.width - MARGIN + 20,
+                    endY: canvas.height / 2 - 60 + (120 / (GRID.rows + 1)) * (rowIndex + 1),
+                    progress: 0
+                });
+                
+                signals.push({
+                    id: `v-${touchId}`,
+                    type: 'vertical',
+                    col: colIndex,
+                    startX: MARGIN + colIndex * cellWidth,
+                    startY: y,
+                    endX: canvas.width / 2 - 60 + (120 / (GRID.cols + 1)) * (colIndex + 1),
+                    endY: canvas.height - MARGIN + 20,
+                    progress: 0
+                });
             }
-        }
+            
+            // Fade out touch after 2 seconds
+            setTimeout(() => {
+                const fadeInterval = setInterval(() => {
+                    const touch = touchPoints.find(t => t.id === touchId);
+                    if (touch) {
+                        touch.alpha -= 0.05;
+                        if (touch.alpha <= 0) {
+                            touchPoints = touchPoints.filter(t => t.id !== touchId);
+                            clearInterval(fadeInterval);
+                        }
+                    } else {
+                        clearInterval(fadeInterval);
+                    }
+                }, 50);
+            }, 2000);
+        });
         
-        function draw() {
-            const W = canvas.width;
-            const H = canvas.height;
-            const gridW = W - 2 * MARGIN;
-            const gridH = H - 2 * MARGIN;
-            const cellW = gridW / GRID.cols;
-            const cellH = gridH / GRID.rows;
+        function drawElectrodes() {
+            // Draw horizontal positive electrodes (red)
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 4;
             
-            // Clear
-            ctx.fillStyle = '#0a0e1a';
-            ctx.fillRect(0, 0, W, H);
-            
-            // Grid background
-            ctx.fillStyle = 'rgba(30, 41, 59, 0.3)';
-            for (let r = 0; r < GRID.rows; r++) {
-                for (let c = 0; c < GRID.cols; c++) {
-                    ctx.fillRect(MARGIN + c * cellW + 1, MARGIN + r * cellH + 1, cellW - 2, cellH - 2);
+            for (let i = 0; i <= GRID.rows; i++) {
+                const y = MARGIN + i * cellHeight;
+                ctx.beginPath();
+                ctx.moveTo(MARGIN, y);
+                ctx.lineTo(canvas.width - MARGIN, y);
+                ctx.stroke();
+                
+                // Draw + symbols
+                ctx.fillStyle = '#ef4444';
+                ctx.font = 'bold 20px Arial';
+                for (let j = 0; j < GRID.cols; j++) {
+                    const x = MARGIN + (j + 0.5) * cellWidth;
+                    ctx.fillText('+', x - 6, y - 10);
                 }
             }
             
-            // Draw electric field lines
-            drawElectricFields(cellW, cellH);
+            // Draw vertical negative electrodes (blue)
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 4;
             
-            // Draw electrodes
-            drawElectrodes(cellW, cellH, W, H);
+            for (let i = 0; i <= GRID.cols; i++) {
+                const x = MARGIN + i * cellWidth;
+                ctx.beginPath();
+                ctx.moveTo(x, MARGIN);
+                ctx.lineTo(x, canvas.height - MARGIN);
+                ctx.stroke();
+                
+                // Draw - symbols
+                ctx.fillStyle = '#3b82f6';
+                ctx.font = 'bold 20px Arial';
+                for (let j = 0; j < GRID.rows; j++) {
+                    const y = MARGIN + (j + 0.5) * cellHeight;
+                    ctx.fillText('−', x + 10, y + 6);
+                }
+            }
             
-            // Draw controllers
-            drawControllers(W, H);
-            
-            // Draw signals
-            drawSignals(W, H);
-            
-            // Draw touches
-            drawTouches();
+            // Draw labels
+            ctx.font = 'bold 16px Arial';
+            ctx.fillStyle = '#ef4444';
+            ctx.fillText('ROW +', 10, MARGIN + cellHeight / 2);
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillText('COL −', MARGIN + cellWidth / 2 - 25, 20);
         }
         
-        function drawElectricFields(cellW, cellH) {
-            for (let r = 0; r < GRID.rows; r++) {
-                for (let c = 0; c < GRID.cols; c++) {
-                    const x1 = MARGIN + c * cellW;
-                    const y1 = MARGIN + r * cellH;
-                    const x2 = x1 + cellW;
-                    const y2 = y1 + cellH;
+        function drawControllers() {
+            // Row controller (right side)
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 3;
+            ctx.fillRect(canvas.width - MARGIN + 20, canvas.height / 2 - 60, 60, 120);
+            ctx.strokeRect(canvas.width - MARGIN + 20, canvas.height / 2 - 60, 60, 120);
+            
+            ctx.fillStyle = '#ef4444';
+            ctx.font = 'bold 12px Arial';
+            ctx.save();
+            ctx.translate(canvas.width - MARGIN + 50, canvas.height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('ROW', -25, 5);
+            ctx.fillText('CONTROLLER', -45, 20);
+            ctx.restore();
+            
+            // Column controller (bottom)
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+            ctx.strokeStyle = '#3b82f6';
+            ctx.fillRect(canvas.width / 2 - 60, canvas.height - MARGIN + 20, 120, 60);
+            ctx.strokeRect(canvas.width / 2 - 60, canvas.height - MARGIN + 20, 120, 60);
+            
+            ctx.fillStyle = '#3b82f6';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText('COLUMN', canvas.width / 2 - 30, canvas.height - MARGIN + 45);
+            ctx.fillText('CONTROLLER', canvas.width / 2 - 42, canvas.height - MARGIN + 60);
+        }
+        
+        function drawWires() {
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            
+            // Wires from horizontal electrodes to row controller
+            for (let i = 0; i <= GRID.rows; i++) {
+                const y = MARGIN + i * cellHeight;
+                ctx.beginPath();
+                ctx.moveTo(canvas.width - MARGIN, y);
+                ctx.lineTo(canvas.width - MARGIN + 20, canvas.height / 2 - 60 + (120 / (GRID.rows + 1)) * (i + 1));
+                ctx.stroke();
+            }
+            
+            // Wires from vertical electrodes to column controller
+            for (let i = 0; i <= GRID.cols; i++) {
+                const x = MARGIN + i * cellWidth;
+                ctx.beginPath();
+                ctx.moveTo(x, canvas.height - MARGIN);
+                ctx.lineTo(canvas.width / 2 - 60 + (120 / (GRID.cols + 1)) * (i + 1), canvas.height - MARGIN + 20);
+                ctx.stroke();
+            }
+            
+            ctx.setLineDash([]);
+        }
+        
+        function drawFieldLines() {
+            // Draw field lines for each cell
+            for (let row = 0; row < GRID.rows; row++) {
+                for (let col = 0; col < GRID.cols; col++) {
+                    const cellX = MARGIN + col * cellWidth;
+                    const cellY = MARGIN + row * cellHeight;
                     
-                    // Find nearest touch
-                    let nearestTouch = null;
-                    let minDist = Infinity;
-                    
-                    touchPoints.forEach(t => {
-                        const nearX = t.x >= x1 - t.radius && t.x <= x2 + t.radius;
-                        const nearY = t.y >= y1 - t.radius && t.y <= y2 + t.radius;
-                        if (nearX && nearY) {
-                            const cx = (x1 + x2) / 2;
-                            const cy = (y1 + y2) / 2;
-                            const dist = Math.hypot(t.x - cx, t.y - cy);
-                            if (dist < minDist) {
-                                minDist = dist;
-                                nearestTouch = t;
-                            }
-                        }
-                    });
-                    
-                    const topPos = r % 2 === 0;
-                    const botPos = (r + 1) % 2 === 0;
-                    const leftPos = c % 2 === 0;
-                    const rightPos = (c + 1) % 2 === 0;
-                    
-                    if (!nearestTouch) {
-                        drawNormalFields(x1, y1, x2, y2, cellW, cellH, topPos, botPos, leftPos, rightPos);
-                    } else {
-                        drawDisruptedFields(x1, y1, x2, y2, nearestTouch);
+                    // Draw 10 vertical field lines + 10 horizontal
+                    for (let i = 0; i < 10; i++) {
+                        // Vertical lines (from top edge to bottom edge of cell)
+                        const x = cellX + (i + 1) * (cellWidth / 11);
+                        drawFieldLine(x, cellY + 5, x, cellY + cellHeight - 5);
+                        
+                        // Horizontal lines
+                        const y = cellY + (i + 1) * (cellHeight / 11);
+                        drawFieldLine(cellX + 5, y, cellX + cellWidth - 5, y);
                     }
                 }
             }
         }
         
-        function drawNormalFields(x1, y1, x2, y2, cellW, cellH, topPos, botPos, leftPos, rightPos) {
-            ctx.strokeStyle = 'rgba(34, 211, 238, 0.6)';
-            ctx.fillStyle = 'rgba(34, 211, 238, 0.6)';
-            ctx.lineWidth = 2;
+        function drawFieldLine(x1, y1, x2, y2) {
+            // Check if line is near any CONDUCTOR touch point
+            let isDisrupted = false;
+            let touchPoint = null;
             
-            const numLines = 10;
-            
-            // Vertical field lines
-            if (topPos !== botPos) {
-                for (let i = 1; i <= numLines; i++) {
-                    const x = x1 + (cellW * i) / (numLines + 1);
-                    ctx.beginPath();
-                    ctx.moveTo(x, topPos ? y1 + 5 : y2 - 5);
-                    ctx.lineTo(x, topPos ? y2 - 5 : y1 + 5);
-                    ctx.stroke();
+            // Only disrupt field lines if it's a conductor
+            if (isConductor) {
+                for (const touch of touchPoints) {
+                    const midX = (x1 + x2) / 2;
+                    const midY = (y1 + y2) / 2;
+                    const dx = midX - touch.x;
+                    const dy = midY - touch.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
                     
-                    const ay = topPos ? y2 - 5 : y1 + 5;
-                    const dir = topPos ? 1 : -1;
-                    ctx.beginPath();
-                    ctx.moveTo(x, ay);
-                    ctx.lineTo(x - 4, ay - 6 * dir);
-                    ctx.lineTo(x + 4, ay - 6 * dir);
-                    ctx.closePath();
-                    ctx.fill();
+                    if (dist < 100) {
+                        isDisrupted = true;
+                        touchPoint = touch;
+                        break;
+                    }
                 }
             }
             
-            // Horizontal field lines
-            if (leftPos !== rightPos) {
-                for (let i = 1; i <= numLines; i++) {
-                    const y = y1 + (cellH * i) / (numLines + 1);
-                    ctx.beginPath();
-                    ctx.moveTo(leftPos ? x1 + 5 : x2 - 5, y);
-                    ctx.lineTo(leftPos ? x2 - 5 : x1 + 5, y);
-                    ctx.stroke();
-                    
-                    const ax = leftPos ? x2 - 5 : x1 + 5;
-                    const dir = leftPos ? 1 : -1;
-                    ctx.beginPath();
-                    ctx.moveTo(ax, y);
-                    ctx.lineTo(ax - 6 * dir, y - 4);
-                    ctx.lineTo(ax - 6 * dir, y + 4);
-                    ctx.closePath();
-                    ctx.fill();
-                }
-            }
-        }
-        
-        function drawDisruptedFields(x1, y1, x2, y2, touch) {
-            ctx.strokeStyle = 'rgba(251, 191, 36, 0.7)';
-            ctx.fillStyle = 'rgba(251, 191, 36, 0.7)';
-            ctx.lineWidth = 2;
-            
-            const numLines = 8;
-            const edges = [
-                { startX: (i) => x1 + ((x2-x1) * i) / (numLines + 1), startY: () => y1 + 5, check: () => touch.y > y1 },
-                { startX: (i) => x1 + ((x2-x1) * i) / (numLines + 1), startY: () => y2 - 5, check: () => touch.y < y2 },
-                { startX: () => x1 + 5, startY: (i) => y1 + ((y2-y1) * i) / (numLines + 1), check: () => touch.x > x1 },
-                { startX: () => x2 - 5, startY: (i) => y1 + ((y2-y1) * i) / (numLines + 1), check: () => touch.x < x2 }
-            ];
-            
-            edges.forEach((edge, edgeIdx) => {
-                if (!edge.check()) return;
+            if (isDisrupted && touchPoint) {
+                // Disrupted field line - only for conductors (orange)
+                ctx.strokeStyle = `rgba(251, 191, 36, ${touchPoint.alpha * 0.5})`;
+                ctx.lineWidth = 2;
                 
-                for (let i = 1; i <= numLines; i++) {
-                    const sx = typeof edge.startX === 'function' ? edge.startX(i) : edge.startX();
-                    const sy = typeof edge.startY === 'function' ? edge.startY(i) : edge.startY();
-                    const dx = touch.x - sx;
-                    const dy = touch.y - sy;
-                    const dist = Math.hypot(dx, dy);
-                    const stopDist = Math.max(0, dist - touch.radius + 10);
-                    const frac = Math.min(1, stopDist / dist);
-                    
-                    ctx.beginPath();
-                    ctx.moveTo(sx, sy);
-                    ctx.quadraticCurveTo(sx + dx * 0.5, sy + dy * 0.5, sx + dx * frac, sy + dy * frac);
-                    ctx.stroke();
-                    
-                    const endX = sx + dx * frac;
-                    const endY = sy + dy * frac;
-                    const angle = Math.atan2(dy, dx);
-                    ctx.beginPath();
-                    ctx.moveTo(endX, endY);
-                    ctx.lineTo(endX - 5 * Math.cos(angle - 0.4), endY - 5 * Math.sin(angle - 0.4));
-                    ctx.lineTo(endX - 5 * Math.cos(angle + 0.4), endY - 5 * Math.sin(angle + 0.4));
-                    ctx.closePath();
-                    ctx.fill();
-                }
-            });
-        }
-        
-        function drawElectrodes(cellW, cellH, W, H) {
-            // Horizontal electrodes
-            for (let i = 0; i <= GRID.rows; i++) {
-                const y = MARGIN + i * cellH;
-                const isPos = i % 2 === 0;
-                
-                ctx.strokeStyle = isPos ? '#ef4444' : '#3b82f6';
-                ctx.lineWidth = 10;
+                // Bend line toward touch (conductor attracts field lines)
                 ctx.beginPath();
-                ctx.moveTo(MARGIN - 10, y);
-                ctx.lineTo(W - MARGIN + 10, y);
+                ctx.moveTo(x1, y1);
+                
+                const cp1x = (x1 + touchPoint.x) / 2;
+                const cp1y = (y1 + touchPoint.y) / 2;
+                const cp2x = (x2 + touchPoint.x) / 2;
+                const cp2y = (y2 + touchPoint.y) / 2;
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
+                
+                ctx.stroke();
+            } else {
+                // Normal field line (cyan) - same for both modes when not disrupted
+                ctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
                 ctx.stroke();
                 
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 24px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                for (let j = 0; j <= GRID.cols; j++) {
-                    const x = MARGIN + j * cellW;
-                    ctx.fillText(isPos ? '+' : '−', x, y);
-                }
+                // Draw arrow
+                const midX = (x1 + x2) / 2;
+                const midY = (y1 + y2) / 2;
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                const arrowSize = 6;
                 
-                ctx.font = 'bold 16px sans-serif';
-                ctx.fillStyle = isPos ? '#ef4444' : '#3b82f6';
-                ctx.textAlign = 'right';
-                ctx.fillText(isPos ? 'ROW +' : 'ROW −', MARGIN - 20, y);
-            }
-            
-            // Vertical electrodes
-            for (let i = 0; i <= GRID.cols; i++) {
-                const x = MARGIN + i * cellW;
-                const isPos = i % 2 === 0;
-                
-                ctx.strokeStyle = isPos ? '#ef4444' : '#3b82f6';
-                ctx.lineWidth = 10;
                 ctx.beginPath();
-                ctx.moveTo(x, MARGIN - 10);
-                ctx.lineTo(x, H - MARGIN + 10);
+                ctx.moveTo(midX, midY);
+                ctx.lineTo(
+                    midX - arrowSize * Math.cos(angle - Math.PI / 6),
+                    midY - arrowSize * Math.sin(angle - Math.PI / 6)
+                );
+                ctx.moveTo(midX, midY);
+                ctx.lineTo(
+                    midX - arrowSize * Math.cos(angle + Math.PI / 6),
+                    midY - arrowSize * Math.sin(angle + Math.PI / 6)
+                );
+                ctx.stroke();
+            }
+        }
+        
+        function drawTouchPoints() {
+            for (const touch of touchPoints) {
+                // Draw finger/insulator circle
+                const color = isConductor ? '168, 85, 247' : '245, 158, 11';
+                ctx.fillStyle = `rgba(${color}, ${touch.alpha * 0.4})`;
+                ctx.strokeStyle = `rgba(${color}, ${touch.alpha * 0.8})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(touch.x, touch.y, 50, 0, Math.PI * 2);
+                ctx.fill();
                 ctx.stroke();
                 
-                ctx.font = 'bold 16px sans-serif';
-                ctx.fillStyle = isPos ? '#ef4444' : '#3b82f6';
+                // Only draw rays for conductors (they actually disrupt the field)
+                if (isConductor) {
+                    // Conductor: rays pointing inward (field attracted to finger)
+                    ctx.strokeStyle = `rgba(251, 191, 36, ${touch.alpha * 0.6})`;
+                    ctx.lineWidth = 2;
+                    for (let i = 0; i < 12; i++) {
+                        const angle = (i / 12) * Math.PI * 2;
+                        const x1 = touch.x + Math.cos(angle) * 70;
+                        const y1 = touch.y + Math.sin(angle) * 70;
+                        const x2 = touch.x + Math.cos(angle) * 50;
+                        const y2 = touch.y + Math.sin(angle) * 50;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y2);
+                        ctx.stroke();
+                        
+                        // Arrow pointing inward
+                        ctx.beginPath();
+                        ctx.moveTo(x2, y2);
+                        ctx.lineTo(
+                            x2 + 5 * Math.cos(angle + Math.PI * 2.5 / 3),
+                            y2 + 5 * Math.sin(angle + Math.PI * 2.5 / 3)
+                        );
+                        ctx.moveTo(x2, y2);
+                        ctx.lineTo(
+                            x2 + 5 * Math.cos(angle - Math.PI * 2.5 / 3),
+                            y2 + 5 * Math.sin(angle - Math.PI * 2.5 / 3)
+                        );
+                        ctx.stroke();
+                    }
+                }
+                // Note: Insulators don't get rays because they don't disrupt the field
+                
+                // Label
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 14px Arial';
                 ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-                ctx.fillText(isPos ? 'COL +' : 'COL −', x, MARGIN - 20);
+                const label = isConductor ? 'FINGER' : 'INSULATOR';
+                ctx.fillText(label, touch.x, touch.y - 65);
             }
         }
         
-        function drawControllers(W, H) {
-            // Right controller
-            ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
-            ctx.fillRect(W - MARGIN/2 - 30, MARGIN, 60, H - 2*MARGIN);
-            ctx.strokeStyle = '#22c55e';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(W - MARGIN/2 - 30, MARGIN, 60, H - 2*MARGIN);
-            
-            ctx.fillStyle = '#22c55e';
-            ctx.font = 'bold 14px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.save();
-            ctx.translate(W - MARGIN/2, H/2);
-            ctx.rotate(-Math.PI/2);
-            ctx.fillText('ROW CONTROLLER', 0, 0);
-            ctx.restore();
-            
-            // Bottom controller
-            ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
-            ctx.fillRect(MARGIN, H - MARGIN/2 - 30, W - 2*MARGIN, 60);
-            ctx.strokeStyle = '#22c55e';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(MARGIN, H - MARGIN/2 - 30, W - 2*MARGIN, 60);
-            
-            ctx.fillStyle = '#22c55e';
-            ctx.font = 'bold 14px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('COLUMN CONTROLLER', W/2, H - MARGIN/2);
-        }
-        
-        function drawSignals(W, H) {
-            signals.forEach(sig => {
-                if (sig.type === 'horizontal') {
-                    const x = sig.startX + (sig.targetX - sig.startX) * sig.progress;
-                    const grad = ctx.createLinearGradient(x - 25, sig.y, x + 25, sig.y);
-                    grad.addColorStop(0, 'rgba(34, 197, 94, 0)');
-                    grad.addColorStop(0.5, 'rgba(34, 197, 94, 1)');
-                    grad.addColorStop(1, 'rgba(34, 197, 94, 0)');
-                    
-                    ctx.strokeStyle = grad;
-                    ctx.lineWidth = 14;
-                    ctx.beginPath();
-                    ctx.moveTo(Math.max(MARGIN, x - 25), sig.y);
-                    ctx.lineTo(Math.min(W - MARGIN/2, x + 25), sig.y);
-                    ctx.stroke();
-                    
-                    ctx.fillStyle = '#22c55e';
-                    ctx.font = 'bold 10px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('SIGNAL', x, sig.y - 20);
+        function drawSignals() {
+            for (let i = signals.length - 1; i >= 0; i--) {
+                const signal = signals[i];
+                signal.progress += 0.015;
+                
+                if (signal.progress >= 1) {
+                    signals.splice(i, 1);
+                    continue;
+                }
+                
+                ctx.strokeStyle = '#22c55e';
+                ctx.fillStyle = '#22c55e';
+                ctx.lineWidth = 4;
+                
+                // Calculate current position along the path
+                let currentX, currentY;
+                
+                if (signal.type === 'horizontal') {
+                    // First part: travel along electrode to edge
+                    if (signal.progress < 0.5) {
+                        const localProgress = signal.progress / 0.5;
+                        currentX = signal.startX + (canvas.width - MARGIN - signal.startX) * localProgress;
+                        currentY = signal.startY;
+                    } else {
+                        // Second part: travel along wire to controller
+                        const localProgress = (signal.progress - 0.5) / 0.5;
+                        currentX = canvas.width - MARGIN + (signal.endX - (canvas.width - MARGIN)) * localProgress;
+                        currentY = signal.startY + (signal.endY - signal.startY) * localProgress;
+                    }
                 } else {
-                    const y = sig.startY + (sig.targetY - sig.startY) * sig.progress;
-                    const grad = ctx.createLinearGradient(sig.x, y - 25, sig.x, y + 25);
-                    grad.addColorStop(0, 'rgba(34, 197, 94, 0)');
-                    grad.addColorStop(0.5, 'rgba(34, 197, 94, 1)');
-                    grad.addColorStop(1, 'rgba(34, 197, 94, 0)');
-                    
-                    ctx.strokeStyle = grad;
-                    ctx.lineWidth = 14;
-                    ctx.beginPath();
-                    ctx.moveTo(sig.x, Math.max(MARGIN, y - 25));
-                    ctx.lineTo(sig.x, Math.min(H - MARGIN/2, y + 25));
-                    ctx.stroke();
-                    
-                    ctx.fillStyle = '#22c55e';
-                    ctx.font = 'bold 10px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('SIGNAL', sig.x + 35, y);
+                    // First part: travel along electrode to edge
+                    if (signal.progress < 0.5) {
+                        const localProgress = signal.progress / 0.5;
+                        currentX = signal.startX;
+                        currentY = signal.startY + (canvas.height - MARGIN - signal.startY) * localProgress;
+                    } else {
+                        // Second part: travel along wire to controller
+                        const localProgress = (signal.progress - 0.5) / 0.5;
+                        currentX = signal.startX + (signal.endX - signal.startX) * localProgress;
+                        currentY = canvas.height - MARGIN + (signal.endY - (canvas.height - MARGIN)) * localProgress;
+                    }
                 }
-            });
-        }
-        
-        function drawTouches() {
-            touchPoints.forEach(touch => {
-                const grad = ctx.createRadialGradient(touch.x, touch.y, 0, touch.x, touch.y, touch.radius);
-                grad.addColorStop(0, 'rgba(168, 85, 247, 0.95)');
-                grad.addColorStop(0.6, 'rgba(168, 85, 247, 0.5)');
-                grad.addColorStop(1, 'rgba(168, 85, 247, 0)');
                 
-                ctx.fillStyle = grad;
+                // Draw signal pulse
                 ctx.beginPath();
-                ctx.arc(touch.x, touch.y, touch.radius, 0, Math.PI * 2);
+                ctx.arc(currentX, currentY, 8, 0, Math.PI * 2);
                 ctx.fill();
                 
-                ctx.strokeStyle = '#a855f7';
-                ctx.lineWidth = 4;
+                // Draw glow effect
                 ctx.beginPath();
-                ctx.arc(touch.x, touch.y, touch.radius, 0, Math.PI * 2);
-                ctx.stroke();
+                ctx.arc(currentX, currentY, 15, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
+                ctx.fill();
                 
-                // Equipotential circles
-                ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([5, 5]);
-                ctx.beginPath();
-                ctx.arc(touch.x, touch.y, touch.radius + 20, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(touch.x, touch.y, touch.radius + 40, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 18px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.shadowColor = '#000000';
-                ctx.shadowBlur = 6;
-                ctx.fillText('FINGER', touch.x, touch.y - touch.radius - 20);
-                ctx.shadowBlur = 0;
-            });
+                // Label
+                if (signal.progress < 0.3) {
+                    ctx.fillStyle = '#22c55e';
+                    ctx.font = 'bold 12px Arial';
+                    if (signal.type === 'horizontal') {
+                        ctx.fillText('SIGNAL', currentX, currentY - 15);
+                    } else {
+                        ctx.fillText('SIGNAL', currentX + 15, currentY);
+                    }
+                }
+            }
         }
         
-        // Initial draw
-        draw();
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawFieldLines();
+            drawElectrodes();
+            drawWires();
+            drawControllers();
+            drawTouchPoints();
+            drawSignals();
+            
+            requestAnimationFrame(animate);
+        }
+        
+        animate();
     </script>
 </body>
 </html>
